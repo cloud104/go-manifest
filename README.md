@@ -10,7 +10,7 @@ imperative updates.
 To use `go-manifest` in your Go project, you can simply add it as a dependency:
 
 ```shell
-go get github.com/totvs-cloud/go-manifest
+go get github.com/cloud104/go-manifest
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/totvs-cloud/go-manifest"
+	"github.com/cloud104/go-manifest"
 	"k8s.io/client-go/rest"
 )
 

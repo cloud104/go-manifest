@@ -1,4 +1,4 @@
-module github.com/totvs-cloud/go-manifest
+module github.com/cloud104/go-manifest
 
 go 1.21.4
 
