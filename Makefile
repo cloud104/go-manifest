@@ -97,22 +97,22 @@ patch-release: build svu ## Force a patch release with bug fixes.
 SVU = $(shell pwd)/bin/svu
 .PHONY: svu
 svu: ## Checks for svu installation and downloads it if not found.
-	$(call go-get-tool,$(SVU),github.com/caarlos0/svu@v1.11.0)
+	$(call go-get-tool,$(SVU),github.com/caarlos0/svu/v2@v2.0.1)
 
 GOIMPORTS_REVISER = $(shell pwd)/bin/goimports-reviser
 .PHONY: goimports-reviser
 goimports-reviser: ## Checks for goimports-reviser installation and downloads it if not found.
-	$(call go-get-tool,$(GOIMPORTS_REVISER),github.com/incu6us/goimports-reviser/v3@v3.4.5)
+	$(call go-get-tool,$(GOIMPORTS_REVISER),github.com/incu6us/goimports-reviser/v3@v3.6.5)
 
 GOFUMPT = $(shell pwd)/bin/gofumpt
 .PHONY: gofumpt
 gofumpt: ## Checks for gofumpt installation and downloads it if not found.
-	$(call go-get-tool,$(GOFUMPT),mvdan.cc/gofumpt@v0.5.0)
+	$(call go-get-tool,$(GOFUMPT),mvdan.cc/gofumpt@v0.6.0)
 
 WSL = $(shell pwd)/bin/wsl
 .PHONY: wsl
 wsl: ## Checks for wsl installation and downloads it if not found.
-	$(call go-get-tool,$(WSL),github.com/bombsimon/wsl/v4/cmd...@v4.1.0)
+	$(call go-get-tool,$(WSL),github.com/bombsimon/wsl/v4/cmd...@v4.4.0)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
