@@ -3,9 +3,13 @@ package manifest
 import (
 	"fmt"
 	"reflect"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	corev1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type Transformer func(u *unstructured.Unstructured) error
@@ -25,6 +29,77 @@ func (l *list) Transform(funcs ...Transformer) (List, error) {
 	}
 
 	return &list{resources: resources, fieldManager: l.fieldManager, client: l.client, mapper: l.mapper}, nil
+}
+
+
+// PodTransformer applies 'fn' to corev1.Pod
+func PodTransformer(fn func(obj *corev1.Pod) error) Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"} {
+			return nil
+		}
+		return Object(fn)(u)
+	}
+}
+
+// ServiceTransformer applies 'fn' to corev1.Service
+func ServiceTransformer(fn func(obj *corev1.Service) error) Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"} {
+			return nil
+		}
+		return Object(fn)(u)
+	}
+}
+
+// NamespaceTransformer applies 'fn' to corev1.Namespace
+func NamespaceTransformer(fn func(obj *corev1.Namespace) error) Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"} {
+			return nil
+		}
+		return Object(fn)(u)
+	}
+}
+
+// DeploymentTransformer applies 'fn' to apps/v1.Deployment
+func DeploymentTransformer(fn func(obj *appsv1.Deployment) error) Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"} {
+			return nil
+		}
+		return Object(fn)(u)
+	}
+}
+
+// StatefulSetTransformer applies 'fn' to apps/v1.StatefulSet
+func StatefulSetTransformer(fn func(obj *appsv1.StatefulSet) error) Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"} {
+			return nil
+		}
+		return Object(fn)(u)
+	}
+}
+
+// DaemonSetTransformer applies 'fn' to apps/v1.DaemonSet
+func DaemonSetTransformer(fn func(obj *appsv1.DaemonSet) error) Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "DaemonSet"} {
+			return nil
+		}
+		return Object(fn)(u)
+	}
+}
+
+// IngressTransformer applies 'fn' to networking.k8s.io/v1.Ingress
+func IngressTransformer(fn func(obj *networkingv1.Ingress) error) Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"} {
+			return nil
+		}
+		return Object(fn)(u)
+	}
 }
 
 // Object is a generic transformer that applies a user-defined function 'fn'
