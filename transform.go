@@ -3,13 +3,12 @@ package manifest
 import (
 	"fmt"
 	"reflect"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	corev1 "k8s.io/api/core/v1"
-	appsv1 "k8s.io/api/apps/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type Transformer func(u *unstructured.Unstructured) error
@@ -31,73 +30,86 @@ func (l *list) Transform(funcs ...Transformer) (List, error) {
 	return &list{resources: resources, fieldManager: l.fieldManager, client: l.client, mapper: l.mapper}, nil
 }
 
+func Pod(fn func(obj *corev1.Pod) error) Transformer {
+	expectedGVK := corev1.SchemeGroupVersion.WithKind("Pod")
 
-// PodTransformer applies 'fn' to corev1.Pod
-func PodTransformer(fn func(obj *corev1.Pod) error) Transformer {
 	return func(u *unstructured.Unstructured) error {
-		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"} {
+		if u.GroupVersionKind() != expectedGVK {
 			return nil
 		}
+
 		return Object(fn)(u)
 	}
 }
 
-// ServiceTransformer applies 'fn' to corev1.Service
-func ServiceTransformer(fn func(obj *corev1.Service) error) Transformer {
+func Service(fn func(obj *corev1.Service) error) Transformer {
+	expectedGVK := corev1.SchemeGroupVersion.WithKind("Service")
+
 	return func(u *unstructured.Unstructured) error {
-		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"} {
+		if u.GroupVersionKind() != expectedGVK {
 			return nil
 		}
+
 		return Object(fn)(u)
 	}
 }
 
-// NamespaceTransformer applies 'fn' to corev1.Namespace
-func NamespaceTransformer(fn func(obj *corev1.Namespace) error) Transformer {
+func Namespace(fn func(obj *corev1.Namespace) error) Transformer {
+	expectedGVK := corev1.SchemeGroupVersion.WithKind("Namespace")
+
 	return func(u *unstructured.Unstructured) error {
-		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"} {
+		if u.GroupVersionKind() != expectedGVK {
 			return nil
 		}
+
 		return Object(fn)(u)
 	}
 }
 
-// DeploymentTransformer applies 'fn' to apps/v1.Deployment
-func DeploymentTransformer(fn func(obj *appsv1.Deployment) error) Transformer {
+func Deployment(fn func(obj *appsv1.Deployment) error) Transformer {
+	expectedGVK := appsv1.SchemeGroupVersion.WithKind("Deployment")
+
 	return func(u *unstructured.Unstructured) error {
-		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"} {
+		if u.GroupVersionKind() != expectedGVK {
 			return nil
 		}
+
 		return Object(fn)(u)
 	}
 }
 
-// StatefulSetTransformer applies 'fn' to apps/v1.StatefulSet
-func StatefulSetTransformer(fn func(obj *appsv1.StatefulSet) error) Transformer {
+func StatefulSet(fn func(obj *appsv1.StatefulSet) error) Transformer {
+	expectedGVK := appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+
 	return func(u *unstructured.Unstructured) error {
-		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"} {
+		if u.GroupVersionKind() != expectedGVK {
 			return nil
 		}
+
 		return Object(fn)(u)
 	}
 }
 
-// DaemonSetTransformer applies 'fn' to apps/v1.DaemonSet
-func DaemonSetTransformer(fn func(obj *appsv1.DaemonSet) error) Transformer {
+func DaemonSet(fn func(obj *appsv1.DaemonSet) error) Transformer {
+	expectedGVK := appsv1.SchemeGroupVersion.WithKind("DaemonSet")
+
 	return func(u *unstructured.Unstructured) error {
-		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "DaemonSet"} {
+		if u.GroupVersionKind() != expectedGVK {
 			return nil
 		}
+
 		return Object(fn)(u)
 	}
 }
 
-// IngressTransformer applies 'fn' to networking.k8s.io/v1.Ingress
-func IngressTransformer(fn func(obj *networkingv1.Ingress) error) Transformer {
+func Ingress(fn func(obj *networkingv1.Ingress) error) Transformer {
+	expectedGVK := networkingv1.SchemeGroupVersion.WithKind("Ingress")
+
 	return func(u *unstructured.Unstructured) error {
-		if u.GroupVersionKind() != schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"} {
+		if u.GroupVersionKind() != expectedGVK {
 			return nil
 		}
+
 		return Object(fn)(u)
 	}
 }
