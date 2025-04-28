@@ -11,6 +11,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -46,6 +47,23 @@ func NewReaderForConfigAndClient(fieldManager string, config *rest.Config, httpC
 }
 
 func (r *Reader) FromUnstructured(resources []*unstructured.Unstructured) (List, error) {
+	return &list{resources: resources, fieldManager: r.fieldManager, client: r.client, mapper: r.mapper}, nil
+}
+
+func (r *Reader) FromObjects(objects []runtime.Object) (List, error) {
+	resources := make([]*unstructured.Unstructured, 0, len(objects))
+
+	for _, obj := range objects {
+		// Convert the object into an unstructured map
+		unstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		// Wrap map into Unstructured
+		resources = append(resources, &unstructured.Unstructured{Object: unstr})
+	}
+
 	return &list{resources: resources, fieldManager: r.fieldManager, client: r.client, mapper: r.mapper}, nil
 }
 
