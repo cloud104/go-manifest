@@ -10,9 +10,13 @@ import (
 	"path"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
 
@@ -20,17 +24,23 @@ type Reader struct {
 	fieldManager string
 	client       dynamic.Interface
 	mapper       meta.RESTMapper
+	scheme       *runtime.Scheme
 }
 
+// Deprecated: use NewReaderWithOptions instead.
 func NewReader(fieldManager string, config *rest.Config) (*Reader, error) {
 	httpClient, err := rest.HTTPClientFor(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 
-	return NewReaderForConfigAndClient(fieldManager, config, httpClient)
+	return NewReaderWithOptions(fieldManager, ReaderOptions{
+		Config:     config,
+		HTTPClient: httpClient,
+	})
 }
 
+// Deprecated: use NewReaderWithOptions instead.
 func NewReaderForConfigAndClient(fieldManager string, config *rest.Config, httpClient *http.Client) (*Reader, error) {
 	m, err := newDynamicRESTMapper(config, httpClient)
 	if err != nil {
@@ -42,7 +52,114 @@ func NewReaderForConfigAndClient(fieldManager string, config *rest.Config, httpC
 		return nil, fmt.Errorf("failed to initialize the manifest reader: %w", err)
 	}
 
-	return &Reader{fieldManager: fieldManager, client: c, mapper: m}, nil
+	scheme := runtime.NewScheme()
+	if err = clientgoscheme.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("failed to initialize the manifest reader: %w", err)
+	}
+
+	return &Reader{fieldManager: fieldManager, client: c, mapper: m, scheme: scheme}, nil
+}
+
+type ReaderOptions struct {
+	Config     *rest.Config
+	HTTPClient *http.Client
+	Mapper     meta.RESTMapper
+	Scheme     *runtime.Scheme
+}
+
+func DefaultReader(fieldManager string) (*Reader, error) {
+	return NewReaderWithOptions(fieldManager, ReaderOptions{})
+}
+
+func NewReaderWithOptions(fieldManager string, options ReaderOptions) (reader *Reader, err error) {
+	config := options.Config
+	if config == nil {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize the manifest reader: %w", err)
+		}
+	}
+
+	httpClient := options.HTTPClient
+	if httpClient == nil {
+		httpClient, err = rest.HTTPClientFor(config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize the manifest reader: %w", err)
+		}
+	}
+
+	mapper := options.Mapper
+	if mapper == nil {
+		mapper, err = newDynamicRESTMapper(config, httpClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize the manifest reader: %w", err)
+		}
+	}
+
+	client, err := dynamic.NewForConfigAndClient(config, httpClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize the manifest reader: %w", err)
+	}
+
+	scheme := options.Scheme
+	if scheme == nil {
+		scheme = runtime.NewScheme()
+		if err = clientgoscheme.AddToScheme(scheme); err != nil {
+			return nil, fmt.Errorf("failed to initialize the manifest reader: %w", err)
+		}
+	}
+
+	return &Reader{
+		fieldManager: fieldManager,
+		client:       client,
+		mapper:       mapper,
+		scheme:       scheme,
+	}, nil
+}
+
+func (r *Reader) FromObject(resources ...metav1.Object) (List, error) {
+	unstructuredResources := make([]*unstructured.Unstructured, 0, len(resources))
+
+	for i, obj := range resources {
+		if obj == nil {
+			continue
+		}
+
+		if u, ok := obj.(*unstructured.Unstructured); ok {
+			unstructuredResources = append(unstructuredResources, u)
+			continue
+		}
+
+		runtimeObj, ok := obj.(runtime.Object)
+		if !ok {
+			return nil, fmt.Errorf("resource at index %d does not implement runtime.Object", i)
+		}
+
+		data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(runtimeObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert resource at index %d to unstructured: %w", i, err)
+		}
+
+		u := &unstructured.Unstructured{Object: data}
+
+		if u.GetAPIVersion() == "" || u.GetKind() == "" {
+			gvk := runtimeObj.GetObjectKind().GroupVersionKind()
+
+			if gvk.Empty() {
+				gvk, err = r.gvkForObject(runtimeObj)
+				if err != nil {
+					return nil, fmt.Errorf("failed to determine apiVersion/kind for resource at index %d: %w", i, err)
+				}
+			}
+
+			u.SetAPIVersion(gvk.GroupVersion().String())
+			u.SetKind(gvk.Kind)
+		}
+
+		unstructuredResources = append(unstructuredResources, u)
+	}
+
+	return r.FromUnstructured(unstructuredResources)
 }
 
 func (r *Reader) FromUnstructured(resources []*unstructured.Unstructured) (List, error) {
@@ -150,4 +267,27 @@ func (r *Reader) readDir(pathname string, recursive bool) (List, error) {
 	}
 
 	return r.FromUnstructured(resources)
+}
+
+func (r *Reader) gvkForObject(obj runtime.Object) (schema.GroupVersionKind, error) {
+	if r.scheme == nil {
+		return schema.GroupVersionKind{}, fmt.Errorf("reader has no scheme")
+	}
+
+	gvks, _, err := r.scheme.ObjectKinds(obj)
+	if err != nil {
+		return schema.GroupVersionKind{}, err
+	}
+
+	if len(gvks) == 0 {
+		return schema.GroupVersionKind{}, fmt.Errorf("no registered kinds for %T", obj)
+	}
+
+	for _, gvk := range gvks {
+		if gvk.Kind != "" && gvk.Version != "" {
+			return gvk, nil
+		}
+	}
+
+	return schema.GroupVersionKind{}, fmt.Errorf("no usable registered kinds for %T", obj)
 }
