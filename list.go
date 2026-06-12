@@ -1,10 +1,12 @@
 package manifest
 
 import (
+	"bytes"
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -15,6 +17,7 @@ type List interface {
 	Transform(funcs ...Transformer) (List, error)
 	Resources() []*unstructured.Unstructured
 	Size() int
+	String() string
 	Append(mfs ...List) List
 }
 
@@ -46,6 +49,10 @@ func (e *empty) Resources() []*unstructured.Unstructured {
 
 func (e *empty) Size() int {
 	return 0
+}
+
+func (e *empty) String() string {
+	return ""
 }
 
 func (e *empty) Append(mfs ...List) List {
@@ -90,6 +97,33 @@ func (l *list) Resources() []*unstructured.Unstructured {
 
 func (l *list) Size() int {
 	return len(l.resources)
+}
+
+func (l *list) String() string {
+	serializer := json.NewSerializerWithOptions(
+		json.DefaultMetaFactory,
+		nil,
+		nil,
+		json.SerializerOptions{
+			Yaml:   true,
+			Pretty: true,
+			Strict: false,
+		},
+	)
+
+	var out bytes.Buffer
+
+	for i, resource := range l.resources {
+		if i > 0 {
+			out.WriteString("---\n")
+		}
+
+		if err := serializer.Encode(resource, &out); err != nil {
+			return ""
+		}
+	}
+
+	return out.String()
 }
 
 func (l *list) Append(mfs ...List) List {
